@@ -3,7 +3,7 @@ version: '3.7'
 services:
   nats:
     image: nats-streaming:latest
-    command: -m 8222 --store SQL --sql_driver postgres --sql_source postgresql://default:password@db:5432/nss_db?sslmode=disable
+    command: -cid test-cluster -m 8222 --store SQL --sql_driver postgres --sql_source postgresql://default:password@db:5432/nss_db?sslmode=disable
     entrypoint: /nats-streaming-server
     ports:
       - "4222:4222"
