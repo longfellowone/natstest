@@ -1,4 +1,0 @@
-systemctl status
-systemctl mask NetworkManager-wait-online.service
-systemctl status NetworkManager.service
-systemd-networkd.service

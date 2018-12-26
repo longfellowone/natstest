@@ -11,6 +11,16 @@ services:
     depends_on:
       - db
 
+  envoy:
+    image: envoyproxy/envoy:latest
+    restart: always
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml
+    network_mode: "host"
+
   db:
     image: postgres
     restart: always
