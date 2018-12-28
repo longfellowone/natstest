@@ -51,8 +51,8 @@ func main() {
 	flag.StringVar(&clusterID, "cluster", "test-cluster", "The NATS Streaming cluster ID")
 	flag.StringVar(&clientID, "id", "stan-pub", "The NATS Streaming client ID to connect with")
 	flag.StringVar(&clientID, "clientid", "stan-pub", "The NATS Streaming client ID to connect with")
-	flag.BoolVar(&async, "a", true, "Publish asynchronously")
-	flag.BoolVar(&async, "async", false, "Publish asynchronously")
+	flag.BoolVar(&async, "a", false, "Publish asynchronously")
+	flag.BoolVar(&async, "async", true, "Publish asynchronously")
 
 	log.SetFlags(0)
 	flag.Usage = usage
@@ -64,46 +64,50 @@ func main() {
 	}
 	defer sc.Close()
 
-	subj, msg := "subject", []byte("message")
+	subj, msg := "subject", []byte("message9")
 
 	ch := make(chan bool)
 	var glock sync.Mutex
 	var guid string
 	acb := func(lguid string, err error) {
 		glock.Lock()
-		log.Printf("Received ACK for guid %s\n", lguid)
+		// log.Printf("Received ACK for guid %s\n", lguid)
 		defer glock.Unlock()
 		if err != nil {
 			log.Fatalf("Error in server ack for guid %s: %v\n", lguid, err)
 		}
-		if lguid != guid {
-			log.Fatalf("Expected a matching guid in ack callback, got %s vs %s\n", lguid, guid)
-		}
-		ch <- true
+		//if lguid != guid {
+		//	log.Fatalf("Expected a matching guid in ack callback, got %s vs %s\n", lguid, guid)
+		//}
+		// ch <- true
 	}
 
 	if !async {
-		err = sc.Publish(subj, msg)
-		if err != nil {
-			log.Fatalf("Error during publish: %v\n", err)
+		for i := 0; i < 100000; i++ {
+			err = sc.Publish(subj, msg)
+			if err != nil {
+				log.Fatalf("Error during publish: %v\n", err)
+			}
+			log.Printf("Published [%s] : '%s'\n", subj, msg)
 		}
-		log.Printf("Published [%s] : '%s'\n", subj, msg)
 	} else {
-		glock.Lock()
-		guid, err = sc.PublishAsync(subj, msg, acb)
-		if err != nil {
-			log.Fatalf("Error during async publish: %v\n", err)
-		}
-		glock.Unlock()
-		if guid == "" {
-			log.Fatal("Expected non-empty guid to be returned.")
-		}
-		log.Printf("Published [%s] : '%s' [guid: %s]\n", subj, msg, guid)
+		for i := 0; i < 1000; i++ {
+			glock.Lock()
+			guid, err = sc.PublishAsync(subj, msg, acb)
+			if err != nil {
+				log.Fatalf("Error during async publish: %v\n", err)
+			}
+			glock.Unlock()
 
+			if guid == "" {
+				log.Fatal("Expected non-empty guid to be returned.")
+			}
+			log.Printf("[%d] - Published [%s] : '%s' [guid: %s]\n", i, subj, msg, guid)
+		}
 		select {
 		case <-ch:
 			break
-		case <-time.After(5 * time.Second):
+		case <-time.After(10 * time.Second):
 			log.Fatal("timeout")
 		}
 

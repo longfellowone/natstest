@@ -1,0 +1,64 @@
+Applying events
+https://blog.pierreprinetti.com/go-es-event-handler/?utm_source=reddit&utm_campaign=1
+
+typically you have 1 stream per aggregate, since that is what makes the aggregate into a transaction boundary.
+https://groups.google.com/forum/#!topic/dddcqrs/EUC8Iez73QY
+
+https://github.com/looplab/eventhorizon/blob/master/examples/todomvc/main.go
+
+https://github.com/olivere/bookstore
+https://github.com/aneshas/gossip/blob/master/docker-compose.yaml
+https://github.com/plimble/natses
+
+curl -H "Content-Type: application/json" -d '{name:"matt",private:"pass"}' localhost/chat/admin/create_channel
+
+https://blog.jonathanoliver.com/event-sourcing-and-snapshots/
+
+Locks: https://medium.com/@deckarep/the-new-kid-in-town-gos-sync-map-de24a6bf7c2c
+
+
+-----------------------
+#1 AggregateID in subject
+subject:'<AggregateID>', message:'{event:"<EventType>", data:"<EventData>"}'
+
+OrderCreated
+ItemAddedToOrder
+ItemQuantityModified
+ItemAddedToOrder
+ItemQuantityModified
+ItemAddedToOrder
+ItemRemovedFromOrder
+OrderPlaced
+OrderReceived
+OrderComplete
+
+subject:'475825', message:'{event:"OrderCreated", data:{ date:"3/12/18", customer:"Mark" }}'
+subject:'475825', message:'{event:"ItemAddedToOrder", data:{ line_item:"1", product:"Pencil" }}'
+subject:'475825', message:'{event:"ItemQuantityModified", data:{ line_item:"1", quantity:"17" }}'
+subject:'475825', message:'{event:"ItemAddedToOrder", data:{ line_item:"2", product:"Marker" }}'
+subject:'475825', message:'{event:"ItemQuantityModified", data:{ line_item:"2", quantity:"12" }}'
+subject:'475825', message:'{event:"ItemAddedToOrder", data:{ line_item:"3", product:"Pen" }}'
+subject:'475825', message:'{event:"ItemQuantityModified", data:{ line_item:"3", quantity:"23" }}'
+subject:'475825', message:'{event:"ItemRemovedFromOrder", data:{ line_item:"3" }'
+subject:'475825', message:'{event:"OrderPlaced", data:{ date:"3/12/18" }}'
+subject:'475825', message:'{event:"OrderReceived", data:{ date:"3/12/19" }}'
+
+-> Command, MarkOrderComplete(475825)
+-> if exists subscribe to 475825 and stan.DeliverAllAvailable()
+-> sub.Unsubscribe()
+-> Apply events to build current state of order
+-> MarkOrderComplete()
+-> Publish, subject:'order.475825', message:'{event:"OrderComplete", data:{ date:"3/12/20" }}'
+
+
+-----------------------
+#2 Event as subject, AggregateID in message
+subject:'<EventType>', message:'{aggregate_id:"<AggregateID>", data:"<EventData>"}'
+
+-> Running durable subscription to OrderComplete event
+-> Command, MarkOrderComplete(475825)
+-> Search local AggregateRepository for 475825 to get most recent state and last sequence number
+-> MarkOrderComplete()
+-> Check sequence number has not changed, Save order 475825 updated state to local AggregateRepository
+-> Publish, subject:'OrderComplete', message:'{aggregate_id:"475825", data:{ date:"3/12/20" }}'
+

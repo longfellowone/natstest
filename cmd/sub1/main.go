@@ -14,6 +14,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -42,13 +43,16 @@ Subscription Options:
 	--unsubscribe                   Unsubscribe the durable on exit
 `
 
-// NOTE: Use tls scheme for TLS, e.g. stan-sub -s tls://demo.nats.io:4443 foo
 func usage() {
 	log.Fatalf(usageStr)
 }
 
 func printMsg(m *stan.Msg, i int) {
-	log.Printf("[#%d] Received on [%s]: '%s'\n", i, m.Subject, m)
+	log.Printf("[#%d] Received on [%s]: '%v' '%v'\n", i, m.Subject, string(m.Data), m)
+}
+
+func printMsg2(m *stan.Msg, i int, e []byte) {
+	log.Printf("Contains: %v - [#%d] Received on [%s]: '%v' '%v'\n", string(e), i, m.Subject, string(m.Data), m)
 }
 
 func main() {
@@ -65,6 +69,8 @@ func main() {
 	var URL string
 
 	//	defaultID := fmt.Sprintf("client.%s", nuid.Next())
+	// USE NUID
+	// http://localhost:8222/streaming/channelsz?subs=1
 
 	flag.StringVar(&URL, "s", stan.DefaultNatsURL, "The nats server URLs (separated by comma)")
 	flag.StringVar(&URL, "server", stan.DefaultNatsURL, "The nats server URLs (separated by comma)")
@@ -74,9 +80,9 @@ func main() {
 	flag.StringVar(&clientID, "clientid", "test1", "The NATS Streaming client ID to connect with")
 	flag.BoolVar(&showTime, "t", true, "Display timestamps")
 	// Subscription options
-	flag.Uint64Var(&startSeq, "seq", 0, "Start at sequence no.")
+	flag.Uint64Var(&startSeq, "seq", 1, "Start at sequence no.")
 	flag.BoolVar(&deliverAll, "all", false, "Deliver all")
-	flag.BoolVar(&deliverLast, "last", true, "Start with last value")
+	flag.BoolVar(&deliverLast, "last", false, "Start with last value")
 	flag.StringVar(&startDelta, "since", "", "Deliver messages since specified time offset")
 	flag.StringVar(&durable, "durable", "testdur", "Durable subscriber name")
 	flag.StringVar(&qgroup, "qgroup", "testdurgroup", "Queue group name")
@@ -109,13 +115,20 @@ func main() {
 	subj, i := "subject", 0
 
 	mcb := func(msg *stan.Msg) {
-		i++
-		printMsg(msg, i)
+		e := []byte("m")
+		if bytes.Contains(msg.Data, e) {
+			i++
+			printMsg2(msg, i, e)
+		} else {
+			//i++
+			//printMsg(msg, i)
+		}
 	}
 
 	startOpt := stan.StartAt(pb.StartPosition_NewOnly)
 
 	if startSeq != 0 {
+		log.Println("start at", startSeq)
 		startOpt = stan.StartAtSequence(startSeq)
 	} else if deliverLast {
 		startOpt = stan.StartWithLastReceived()
@@ -131,11 +144,13 @@ func main() {
 		startOpt = stan.StartAtTimeDelta(ago)
 	}
 
-	_, err = sc.QueueSubscribe(subj, qgroup, mcb, startOpt, stan.DurableName(durable))
+	start := time.Now()
+	_, err = sc.QueueSubscribe(subj, qgroup, mcb, startOpt) // stan.DurableName(durable)
 	if err != nil {
 		sc.Close()
 		log.Fatal(err)
 	}
+	log.Printf("%v", time.Since(start))
 
 	log.Printf("Listening on [%s], clientID=[%s], qgroup=[%s] durable=[%s]\n", subj, clientID, qgroup, durable)
 
